@@ -10,12 +10,17 @@ export interface ModelStatus { id: ModelId; name: string; configured: boolean; d
 export interface Health { status: "ok"; ready: boolean; device: string; models_configured: number }
 export interface PredictResponse { prediction: Prediction }
 export interface CompareResponse { results: Prediction[]; errors: { model_id: ModelId; model_name: string; message: string }[]; agreement: { unanimous: boolean; agreeing_models: ModelId[]; disagreeing_models: ModelId[] } | null }
-const base = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/$/, "");
+const configuredBase = (process.env.NEXT_PUBLIC_API_URL || "").trim().replace(/\/$/, "");
+function apiBase(): string {
+  if (configuredBase) return configuredBase;
+  if (process.env.NODE_ENV !== "production") return "http://localhost:8000";
+  throw new Error("NEXT_PUBLIC_API_URL is missing. Set it to the deployed API origin in the Vercel project environment variables.");
+}
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 180_000);
   try {
-    const response = await fetch(`${base}${path}`, { ...init, signal: controller.signal, headers: { "Content-Type": "application/json", ...init?.headers } });
+    const response = await fetch(`${apiBase()}${path}`, { ...init, signal: controller.signal, headers: { "Content-Type": "application/json", ...init?.headers } });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.detail || `Backend returned ${response.status}`);
     return data as T;
